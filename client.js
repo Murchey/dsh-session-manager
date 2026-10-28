@@ -46,6 +46,7 @@ window.__ModuleLoader__.load({
       pruneFailed: '清理失败：{message}',
       live: '运行中',
       subagent: '子代理',
+      archived: '已归档',
       orphan: '仅磁盘',
       empty: '还没有会话',
       noMatches: '没有匹配的会话',
@@ -100,6 +101,7 @@ window.__ModuleLoader__.load({
       pruneFailed: 'Cleanup failed: {message}',
       live: 'Live',
       subagent: 'Subagent',
+      archived: 'Archived',
       orphan: 'Disk only',
       empty: 'No sessions yet',
       noMatches: 'No matching sessions',
@@ -164,6 +166,7 @@ window.__ModuleLoader__.load({
 .ss-badges{display:inline-flex;gap:4px;flex:none;flex-wrap:wrap}
 .ss-badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:11px;line-height:18px;white-space:nowrap}
 .ss-badge-live{color:var(--dsw-alias-state-warn-primary)}
+.ss-badge-archived{color:var(--dsw-alias-state-idle-primary);border:.5px solid var(--dsw-alias-border-l1)}
 .ss-row-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:4px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
 .ss-id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;background:var(--dsw-alias-bg-layer-2);border-radius:6px;padding:0 5px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
 .ss-cwd{min-width:0;max-width:56ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -194,7 +197,7 @@ window.__ModuleLoader__.load({
 .ss-btn-danger{color:var(--dsw-alias-state-error-primary);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, var(--dsw-alias-border-l1))}
 .ss-btn-danger:hover{background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent)}
 .ss-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:transparent;-webkit-backdrop-filter:brightness(.55) blur(2px);backdrop-filter:brightness(.55) blur(2px)}
-.ss-dialog{width:min(480px,100%);max-height:calc(100dvh - 48px);overflow:auto;background:var(--dsw-alias-bg-overlay);border:.5px solid var(--dsw-alias-border-l1);border-radius:18px;padding:20px}
+.ss-dialog{width:min(480px,100%);max-height:calc(100dvh - 48px);overflow:auto;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2);border-radius:18px;padding:20px}
 .ss-dialog h2{font-size:18px;font-weight:500;line-height:26px;margin:0 0 8px}
 .ss-dialog p{margin:0 0 12px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}
 .ss-dialog-list{max-height:160px;overflow:auto;margin:0 0 12px;padding-left:18px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:21px}
@@ -536,6 +539,7 @@ window.__ModuleLoader__.load({
                 'span',
                 { className: 'ss-badges' },
                 session.live ? h('span', { className: 'ss-badge ss-badge-live' }, t('live')) : null,
+                session.archived ? h('span', { className: 'ss-badge ss-badge-archived' }, t('archived')) : null,
                 session.subagent ? h('span', { className: 'ss-badge' }, t('subagent')) : null,
                 session.orphan ? h('span', { className: 'ss-badge' }, t('orphan')) : null,
               ),

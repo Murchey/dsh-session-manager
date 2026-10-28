@@ -136,6 +136,7 @@ function registerHttpRoutes(ctx, options) {
               bytes: session.bytes,
               eventCount: session.eventCount ?? null,
               live: session.live,
+              archived: session.archived === true,
               orphan: session.orphan,
               subagent: !session.id.startsWith('session-'),
             })),
@@ -262,7 +263,7 @@ async function listAction(ctx, options, limit, currentSessionId) {
   ];
   if (listing.shown.length === 0) lines.push('No sessions found.');
   for (const session of listing.shown) {
-    const flags = [session.current ? 'CURRENT' : '', session.live ? 'LIVE' : '', session.orphan ? 'ORPHAN (no stored header)' : '']
+    const flags = [session.current ? 'CURRENT' : '', session.live ? 'LIVE' : '', session.archived ? 'ARCHIVED' : '', session.orphan ? 'ORPHAN (no stored header)' : '']
       .filter(Boolean)
       .join(', ');
     lines.push(

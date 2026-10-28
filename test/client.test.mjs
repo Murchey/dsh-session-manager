@@ -106,6 +106,8 @@ assert.equal(dictionaries.length, 1);
 assert.equal(dictionaries[0].namespace, 'sessionShredder');
 assert.equal(dictionaries[0].dicts.zh.panel, '会话存储');
 assert.equal(dictionaries[0].dicts.en.panel, 'Session storage');
+assert.equal(dictionaries[0].dicts.zh.archived, '已归档');
+assert.equal(dictionaries[0].dicts.en.archived, 'Archived');
 assert.ok(dictionaries[0].dicts.zh.deleteTitle);
 assert.ok(dictionaries[0].dicts.en.deleteTitle);
 
@@ -176,6 +178,7 @@ const css = style.children.join('');
 assert.ok(css.includes('--dsw-alias-bg-base'), 'theme tokens are used');
 assert.ok(css.includes('--dsw-alias-label-secondary'), 'secondary label token is used');
 assert.ok(css.includes('backdrop-filter:brightness(.55)'), 'dialog scrim dims instead of washing the screen white');
+assert.ok(css.includes('.ss-badge-archived'), 'archived sessions have a visible badge');
 assert.ok(!css.includes('bg-overlay) 78%'), 'the old milky overlay is gone');
 assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(css), 'no literal hex colors in page CSS');
 assert.ok(!css.includes('@deepseek-ai/dsh-client-ui-primitives'), 'no UI-primitive dependency');

@@ -36,6 +36,7 @@ const ctx = {
         },
       };
     }
+    if (name === 'workspaceRegistry') return { archivedSessionIds: ['session-archived-9999'] };
     return undefined;
   },
   tools: {
@@ -46,7 +47,14 @@ const ctx = {
   },
   sessionPersistence: {
     async list() {
-      return [];
+      return [
+        {
+          header: { version: 4, id: 'session-archived-9999', createdAt: 1_700_000_000_000, cwd: 'D:\Test' },
+          revision: 'rev-archived',
+          eventCount: 1,
+          sizeBytes: 0,
+        },
+      ];
     },
     async stat() {
       return undefined;
@@ -71,9 +79,12 @@ assert.deepEqual(listRoute.methods, ['GET']);
 const listResponse = await listRoute.fetch(new Request('http://localhost/api/session-shredder/sessions'));
 assert.equal(listResponse.status, 200);
 const listing = await listResponse.json();
-assert.equal(listing.total, 0);
+assert.equal(listing.total, 1);
 assert.equal(listing.totalBytes, 0);
-assert.deepEqual(listing.sessions, []);
+assert.equal(listing.sessions.length, 1);
+assert.equal(listing.sessions[0].id, 'session-archived-9999');
+assert.equal(listing.sessions[0].archived, true);
+assert.equal(listing.sessions[0].live, false);
 assert.equal(listing.hidden, 0);
 
 const deleteRoute = routes.get('/api/session-shredder/delete');
