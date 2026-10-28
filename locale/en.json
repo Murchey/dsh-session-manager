@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Shredder",
+    "description": "Permanently delete a DSH session from disk: its append-only log, projection cache, legacy cache seed, and unreferenced attachments."
+  }
+}

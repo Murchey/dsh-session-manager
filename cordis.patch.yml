@@ -1,0 +1,11 @@
+# Session Shredder — DSH bundle patch
+#
+# Inserts the Host plugin that registers the `session_purge` tool. The empty
+# config selects the safe defaults: approval required, normal (non-overwrite)
+# deletion, attachment cleanup enabled, and the DSH home discovered from
+# $DSH_HOME (falling back to ~/.dsh).
+
+- insert:
+    - id: session-shredder
+      name: dsh-session-storage
+      config: {}
