@@ -17,7 +17,7 @@ globalThis.window = {
 
 await import('../client.js');
 
-assert.equal(definition.id, 'dsh-session-storage');
+assert.equal(definition.id, '@murchey/dsh-session-manager');
 
 const hookStates = [];
 let hookCursor = 0;

@@ -3,7 +3,7 @@
 基于 DeepSeek Harness 的会话管理插件：查看每个会话的磁盘占用，永久删除会话，并清理侧边栏中数据已不存在的失效条目。
 
 > 仓库名：`dsh-session-manager`
-> npm 包名：`dsh-session-storage`（仓库名与包名可以不同）
+> npm 包名：`@murchey/dsh-session-manager`
 
 插件在侧边栏增加一个“会话存储”图标，打开一个专门页面，列出每个会话占用的空间，支持搜索、排序、单个或批量删除；同一个删除实现也注册为模型工具 `session_purge`。删除对象包括：
 
@@ -22,7 +22,7 @@ DSH 的 `sessionPersistence` 接口明确没有删除 API（日志会一直累�
 从 npm 安装（发布后）：
 
 ```bash
-dsh plugin --profile <profile> add dsh-session-storage
+dsh plugin --profile <profile> add @murchey/dsh-session-manager
 ```
 
 本地开发安装：
@@ -87,7 +87,7 @@ dsh plugin --profile <profile> add link:<此目录绝对路径>
 
 ```yaml
 - id: session-shredder
-  name: dsh-session-storage
+  name: '@murchey/dsh-session-manager'
   config:
     requireApproval: true       # 默认 true；无人值守环境才建议关闭
     secureOverwrite: false      # true = 先用 0 覆盖文件内容再 unlink
@@ -126,10 +126,12 @@ dsh plugin --profile <profile> add link:<此目录绝对路径>
 包已移除 `private`，`files` 只包含运行所需文件，GPL-3.0-only 随包附带 `LICENSE`。发布前先确认包名可用：
 
 ```bash
-npm view dsh-session-storage version
+npm view @murchey/dsh-session-manager version
 ```
 
-`dsh-session-storage` 当前在 npm 上未被占用；`dsh-session-manager` 已被其他包使用，**不要**直接把包名改成仓库名。若之后需要改名，以下三处必须保持一致：
+`@murchey/dsh-session-manager` 当前在 npm 上未被占用，但发布前要确认 `@murchey` 这个 scope 属于你的 npm 账号或组织：`npm login` 后执行 `npm whoami`，并在 npm 网页/组织设置中确认权限。scoped 包不会被别人抢注，但只有 scope 所有者能发布。若 scope 不可用，换一个你拥有的 scope，并同步修改包名、client id 和 patch 行名。
+
+仓库名 `dsh-session-manager` 对应的 **unscoped** 包名已被其他包占用，所以这里使用 scoped 名称。改名时以下三处必须保持一致：
 
 1. `package.json` 的 `name`；
 2. `client.js` 里 `window.__ModuleLoader__.load({ id: ... })` 的 id；
@@ -143,7 +145,7 @@ npm pack --dry-run        # 检查会打进 tarball 的文件
 npm publish --access public
 ```
 
-发布 scoped 包时使用 `@你的scope/dsh-session-storage`，并把上面三处同步改成该 scoped 名称；`npm publish --access public` 让公开 scoped 包可被安装。
+发布 scoped 包时使用 `@murchey/dsh-session-manager`，`npm publish --access public` 让公开 scoped 包可被安装。
 
 版本升级：
 
@@ -157,7 +159,7 @@ npm publish
 用户安装发布后的插件：
 
 ```bash
-dsh plugin --profile <profile> add dsh-session-storage
+dsh plugin --profile <profile> add @murchey/dsh-session-manager
 ```
 
 ## License

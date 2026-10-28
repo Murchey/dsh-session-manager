@@ -10,7 +10,7 @@
  * not depend on the Host's private UI primitives.
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-session-storage',
+  id: '@murchey/dsh-session-manager',
   factory(require) {
     const React = require('react');
     const h = React.createElement;

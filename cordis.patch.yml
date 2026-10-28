@@ -7,5 +7,5 @@
 
 - insert:
     - id: session-shredder
-      name: dsh-session-storage
+      name: '@murchey/dsh-session-manager'
       config: {}
