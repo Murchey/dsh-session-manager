@@ -1,0 +1,64 @@
+name: Publish latest build
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Release commits are handled by publish-release.yml; never publish a dev
+    # build after them (it would move the `latest` dist-tag backwards).
+    if: "${{ !startsWith(github.event.head_commit.message, 'chore: release v') }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Compute dev version
+        id: version
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          PKG_BASE=${PKG_VERSION%%-*}
+
+          LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1 || true)
+          TAG_BASE=${LATEST_TAG#v}
+          TAG_BASE=${TAG_BASE%%-*}
+
+          if [ -n "$TAG_BASE" ] && [ "$(printf '%s\n%s\n' "$PKG_BASE" "$TAG_BASE" | sort -V | tail -n 1)" = "$TAG_BASE" ]; then
+            BASE=$TAG_BASE
+          else
+            BASE=$PKG_BASE
+          fi
+
+          IFS=. read -r MAJOR MINOR PATCH <<< "$BASE"
+          VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-dev.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}.${GITHUB_SHA::7}"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing $VERSION (base $BASE)"
+
+          VERSION="$VERSION" node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.VERSION;fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n');"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Publish latest
+        run: npm publish --access public --tag latest

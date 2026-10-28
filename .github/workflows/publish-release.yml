@@ -1,0 +1,123 @@
+name: Publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, for example 0.2.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Validate version
+        id: validate
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "Run this workflow from the main branch." >&2
+            exit 1
+          fi
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must be plain semver like 0.2.0" >&2
+            exit 1
+          fi
+
+          LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1 || true)
+          LATEST=${LATEST_TAG#v}
+          if [ -n "$LATEST" ] && [ "$LATEST" != "$VERSION" ]; then
+            if [ "$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+              echo "Version $VERSION must be greater than the latest tag $LATEST" >&2
+              exit 1
+            fi
+          fi
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists; a re-run will skip the bump."
+          fi
+
+          NAME=$(node -p "require('./package.json').name")
+
+          PUBLISHED_LATEST=$(npm view "$NAME" version 2>/dev/null || true)
+          if [ -n "$PUBLISHED_LATEST" ] && [ "$PUBLISHED_LATEST" != "undefined" ]; then
+            if [ "$(printf '%s\n%s\n' "$PUBLISHED_LATEST" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+              echo "Version $VERSION must be greater than npm latest $PUBLISHED_LATEST" >&2
+              exit 1
+            fi
+          fi
+
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Releasing $NAME@$VERSION"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Bump, commit and tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          PKG_VERSION=$(node -p "require('./package.json').version")
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            if [ "$PKG_VERSION" != "$VERSION" ]; then
+              echo "Tag v$VERSION exists but package.json says $PKG_VERSION" >&2
+              exit 1
+            fi
+            echo "Version already tagged; skipping the bump."
+          else
+            if [ "$PKG_VERSION" = "$VERSION" ] || [ "$(printf '%s\n%s\n' "$PKG_VERSION" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+              echo "package.json version $PKG_VERSION must be lower than $VERSION" >&2
+              exit 1
+            fi
+
+            npm version "$VERSION" -m "chore: release v%s"
+            git push origin HEAD:main
+            git push origin "v$VERSION"
+          fi
+
+      - name: Publish to npm
+        run: |
+          set -euo pipefail
+          if npm view "${{ steps.validate.outputs.name }}@$VERSION" version >/dev/null 2>&1; then
+            echo "Already published $VERSION; skipping npm publish."
+          else
+            npm publish --access public --tag latest
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists."
+          else
+            gh release create "v$VERSION" --title "v$VERSION" --generate-notes
+          fi

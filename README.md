@@ -162,6 +162,29 @@ npm publish
 dsh plugin --profile <profile> add @murchey/dsh-session-manager
 ```
 
+## GitHub Actions 发布
+
+仓库包含两个工作流：
+
+| 文件 | 触发 | 行为 |
+| --- | --- | --- |
+| `.github/workflows/publish-latest.yml` | push 到 `main`（release 提交除外） | 生成 `X.Y.(Z+1)-dev.<run>.<attempt>.<sha>` 版本，测试后执行 `npm publish --tag latest` |
+| `.github/workflows/publish-release.yml` | `workflow_dispatch` 手动触发 | 校验版本号 → 跑测试 → 改 `package.json`、提交、打 `vX.Y.Z` 标签并推送 → `npm publish --tag latest` → 创建 GitHub Release |
+
+配置要求：
+
+1. 在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 添加 `NPM_TOKEN`。使用 npm 的 **Automation** 或 **Granular access token**，至少拥有 `@murchey` scope 的 publish 权限；普通带 2FA 的密码不能用于 CI。
+2. 在 **Settings → Actions → General → Workflow permissions** 允许 **Read and write permissions**；`publish-release` 需要推送版本提交和标签。
+3. 如果 `main` 有分支保护，需要允许 GitHub Actions 推送，或给 release 流程使用可绕过保护的令牌，否则 `git push` 会失败。
+
+行为说明：
+
+- 每次 push 到 `main` 都会发布一个新的 dev 版本，并把 npm 的 `latest` dist-tag 指向它，所以 `npm install @murchey/dsh-session-manager` 默认安装最新提交构建。若希望 `latest` 只指向正式版，把 `publish-latest.yml` 里的 `--tag latest` 改成 `--tag dev`。
+- dev 版本总是“当前最新 tag/版本的下一个 patch 的 prerelease”，因此正式版 `0.2.0` 会高于之前的 `0.1.1-dev.*`。
+- release 工作流创建的提交信息为 `chore: release vX.Y.Z`，自动 latest 工作流会跳过它，避免正式版刚发布又被 dev 版覆盖。
+- 正式版输入必须大于最新的 `v*` 标签；重复运行会尽量幂等：标签已存在时跳过版本提交，npm 上已存在该版本时跳过 publish，GitHub Release 已存在时跳过创建。
+- 两个工作流共用 `npm-publish` 并发组，避免同时移动 `latest`。
+
 ## License
 
 GPL-3.0-only，见 [LICENSE](LICENSE)。
