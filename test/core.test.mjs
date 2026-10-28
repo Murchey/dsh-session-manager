@@ -170,7 +170,8 @@ async function main() {
   assert.equal(encodeSegment('session-a/b'), 'session-a~002Fb');
   assert.equal(decodeSegment(encodeSegment('会话~id')), '会话~id');
   assert.equal(formatBytes(1536), '1.5 KiB');
-  assert.throws(() => resolveOptions({ dataDir: 'C:\\' }), PurgeError);
+  const filesystemRoot = path.parse(process.cwd()).root;
+  assert.throws(() => resolveOptions({ dataDir: filesystemRoot }), PurgeError);
 
   const listing = await listSessions(ctx, options, { limit: 10, currentSessionId: targetId });
   assert.equal(listing.total, 4, 'two stored sessions plus two orphan directories');
