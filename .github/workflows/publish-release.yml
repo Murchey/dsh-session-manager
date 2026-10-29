@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: npm-publish
+  group: github-release
   cancel-in-progress: false
 
 jobs:
@@ -20,7 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       VERSION: ${{ inputs.version }}
     steps:
       - name: Checkout
@@ -32,10 +31,8 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
 
       - name: Validate version
-        id: validate
         run: |
           set -euo pipefail
           if [ "${GITHUB_REF_NAME}" != "main" ]; then
@@ -57,22 +54,7 @@ jobs:
             fi
           fi
 
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            echo "Tag v$VERSION already exists; a re-run will skip the bump."
-          fi
-
-          NAME=$(node -p "require('./package.json').name")
-
-          PUBLISHED_LATEST=$(npm view "$NAME" version 2>/dev/null || true)
-          if [ -n "$PUBLISHED_LATEST" ] && [ "$PUBLISHED_LATEST" != "undefined" ]; then
-            if [ "$(printf '%s\n%s\n' "$PUBLISHED_LATEST" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
-              echo "Version $VERSION must be greater than npm latest $PUBLISHED_LATEST" >&2
-              exit 1
-            fi
-          fi
-
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "Releasing $NAME@$VERSION"
+          echo "Releasing version $VERSION"
 
       - name: Run tests
         run: npm test
@@ -103,18 +85,6 @@ jobs:
 
             git push origin HEAD:main
             git push origin "v$VERSION"
-          fi
-
-      - name: Verify npm authentication
-        run: npm whoami --registry=https://registry.npmjs.org
-
-      - name: Publish to npm
-        run: |
-          set -euo pipefail
-          if npm view "${{ steps.validate.outputs.name }}@$VERSION" version >/dev/null 2>&1; then
-            echo "Already published $VERSION; skipping npm publish."
-          else
-            npm publish --access public --tag latest
           fi
 
       - name: Create GitHub release
