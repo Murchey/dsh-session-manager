@@ -1,6 +1,6 @@
 {
   "name": "@murchey/dsh-session-manager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "基于 DeepSeek Harness 的会话存储管理插件：查看会话磁盘占用、永久删除会话，并清理侧边栏失效条目。",
   "type": "module",
   "exports": {
