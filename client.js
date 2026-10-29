@@ -314,9 +314,12 @@ window.__ModuleLoader__.load({
       const deleteRef = React.useRef(null);
       const selectAllRef = React.useRef(null);
       const wasOpen = React.useRef(false);
+      const loadingRef = React.useRef(false);
 
-      const load = React.useCallback(async () => {
-        setLoading(true);
+      const load = React.useCallback(async (showLoading = true) => {
+        if (loadingRef.current) return;
+        loadingRef.current = true;
+        if (showLoading) setLoading(true);
         try {
           const value = await requestJson('/api/session-shredder/sessions');
           setSessions(Array.isArray(value.sessions) ? value.sessions : []);
@@ -327,12 +330,29 @@ window.__ModuleLoader__.load({
         } catch (loadError) {
           setError(loadError instanceof Error ? loadError.message : String(loadError));
         } finally {
-          setLoading(false);
+          loadingRef.current = false;
+          if (showLoading) setLoading(false);
         }
       }, []);
 
       React.useEffect(() => {
         void load();
+      }, [load]);
+
+      // The Host derives `live` from its current agent registry. Keep the page
+      // synchronized while it stays mounted, and refresh immediately when a
+      // backgrounded tab becomes visible again. This avoids requiring an app
+      // restart after an agent finishes or is stopped.
+      React.useEffect(() => {
+        const refreshIfVisible = () => {
+          if (typeof document === 'undefined' || document.visibilityState === 'visible') void load(false);
+        };
+        const timer = setInterval(refreshIfVisible, 5000);
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshIfVisible);
+        return () => {
+          clearInterval(timer);
+          if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshIfVisible);
+        };
       }, [load]);
 
       React.useEffect(() => {

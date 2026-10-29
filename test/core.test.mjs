@@ -177,6 +177,17 @@ async function main() {
   assert.equal(listing.total, 4, 'two stored sessions plus two orphan directories');
   assert.equal(listing.shown.find((row) => row.id === targetId).current, true);
 
+  const changingLiveIds = [];
+  const dynamicCtx = makeContext(persistence, { liveIds: changingLiveIds });
+  let dynamicListing = await listSessions(dynamicCtx, options, { limit: 10 });
+  assert.equal(dynamicListing.shown.find((row) => row.id === survivorId).live, false);
+  changingLiveIds.push(survivorId);
+  dynamicListing = await listSessions(dynamicCtx, options, { limit: 10 });
+  assert.equal(dynamicListing.shown.find((row) => row.id === survivorId).live, true);
+  changingLiveIds.length = 0;
+  dynamicListing = await listSessions(dynamicCtx, options, { limit: 10 });
+  assert.equal(dynamicListing.shown.find((row) => row.id === survivorId).live, false);
+
   const plan = await planPurge(ctx, options, [targetId, orphanId, bareId], { currentSessionId: 'session-current' });
   assert.equal(plan.blockers.length, 0);
   assert.equal(plan.targets.length, 3);

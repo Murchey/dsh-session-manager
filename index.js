@@ -18,8 +18,8 @@ import {
   resolveOptions,
 } from './lib/core.js';
 
-/** Cordis activation requires the tool registry and the persistence seam. */
-export const inject = ['tools', 'sessionPersistence'];
+/** Cordis activation requires the tool, persistence, and live-agent services. */
+export const inject = ['tools', 'sessionPersistence', 'agents'];
 
 /** Stable plugin row name. */
 export const name = 'session-shredder';
