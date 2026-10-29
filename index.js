@@ -30,7 +30,7 @@ const TOOL_DESCRIPTION = [
   'Permanently delete DSH session data from disk: the append-only session log plus every historical format generation, the projection-cache record, the legacy cache-seed entry, and attachments that no surviving session references.',
   'This is irreversible. Use it only when the user explicitly asks to permanently delete sessions. Never use it for "archive", "hide", cleanup suggestions, or the current session.',
   'Workflow: call action:"list" to discover ids, call action:"plan" for the exact footprint and blockers, show that plan to the user, and call action:"purge" with confirm:true only after the user agrees.',
-  'A purge refuses the current session and any live session, and asks the user for approval before deleting.',
+  'A purge refuses the current session and any session with a running turn, and asks the user for approval before deleting. Archived sessions are deletable once idle, and their archive/pin entries are dropped with the data.',
 ].join(' ');
 
 /**
@@ -136,6 +136,7 @@ function registerHttpRoutes(ctx, options) {
               bytes: session.bytes,
               eventCount: session.eventCount ?? null,
               live: session.live,
+              resident: session.resident === true,
               archived: session.archived === true,
               orphan: session.orphan,
               subagent: !session.id.startsWith('session-'),
@@ -187,6 +188,7 @@ function registerHttpRoutes(ctx, options) {
             deletedBytes: result.deletedBytes,
             attachments: result.attachments,
             requestImageCache: result.requestImageCache,
+            metadata: result.metadata,
             targets: result.targets.map((target) => ({
               id: target.id,
               bytes: target.bytes,
@@ -283,8 +285,12 @@ async function planAction(ctx, options, sessionIds, currentSessionId) {
     `Purge plan (dry run) — ${plan.targets.length} session${plan.targets.length === 1 ? '' : 's'}, ${formatBytes(plan.totalBytes)} on disk.`,
   ];
   for (const target of plan.targets) {
+    const flags = [target.archived ? 'ARCHIVED' : '', target.resident ? 'RESIDENT' : '', target.live ? 'RUNNING' : '']
+      .filter(Boolean)
+      .join(', ');
     lines.push(
-      `- ${target.id}${target.title !== undefined ? `  "${target.title}"` : ''}  ${formatBytes(target.bytes)}`,
+      `- ${target.id}${target.title !== undefined ? `  "${target.title}"` : ''}  ${formatBytes(target.bytes)}` +
+        `${flags === '' ? '' : `  [${flags}]`}`,
     );
     if (target.dirs.length > 0) {
       for (const dir of target.dirs) lines.push(`    log: ${dir}`);
@@ -344,6 +350,9 @@ async function purgeAction(ctx, options, args, exec, currentSessionId) {
     lines.push(
       `Request-image cache: cleared (${formatBytes(result.requestImageCache.bytes)}, ${result.requestImageCache.files} file(s)).`,
     );
+  }
+  if (Array.isArray(result.metadata?.pruned) && result.metadata.pruned.length > 0) {
+    lines.push(`Archive/pin entries removed: ${result.metadata.pruned.join(', ')}.`);
   }
   for (const target of result.targets) {
     lines.push(

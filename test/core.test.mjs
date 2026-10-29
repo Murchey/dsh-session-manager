@@ -83,11 +83,36 @@ function makePersistence(eventsById) {
   };
 }
 
-function makeContext(persistence, { liveIds = [] } = {}) {
+function makeContext(persistence, { runningIds = [], idleIds = [], archivedIds = [], pinnedIds = [] } = {}) {
+  const archived = new Set(archivedIds);
+  const pinned = new Set(pinnedIds);
+  const registry = {
+    get archivedSessionIds() {
+      return [...archived];
+    },
+    get pinnedSessionIds() {
+      return [...pinned];
+    },
+    async unarchiveSession(id) {
+      archived.delete(id);
+    },
+    async unpinSession(id) {
+      pinned.delete(id);
+    },
+  };
   return {
     sessionPersistence: persistence,
+    workspaceRegistry: registry,
     get(name) {
-      if (name === 'agents') return { list: () => liveIds.map((id) => ({ id })) };
+      if (name === 'agents') {
+        return {
+          list: () => [
+            ...runningIds.map((id) => ({ id, status: 'running' })),
+            ...idleIds.map((id) => ({ id, status: 'idle' })),
+          ],
+        };
+      }
+      if (name === 'workspaceRegistry') return registry;
       return undefined;
     },
   };
@@ -123,11 +148,14 @@ async function main() {
   const survivorDir = path.join(options.sessionsRoot, '--D-Projects-ShredderTest--', encodeSegment(survivorId));
   const orphanDir = path.join(options.sessionsRoot, '--D-Projects-ShredderTest--', encodeSegment(orphanId));
   const bareDir = path.join(options.sessionsRoot, '--D-Projects-ShredderTest--', encodeSegment(bareId));
+  const archivedId = 'session-archived-0004';
+  const archivedDir = path.join(options.sessionsRoot, '--D-Projects-ShredderTest--', encodeSegment(archivedId));
   await writeFile(path.join(targetDir, 'session.v3.jsonl.zstd'), 'old generation');
   await writeFile(path.join(targetDir, 'session.v4.jsonl.zstd'), 'current generation');
   await writeFile(path.join(survivorDir, 'session.v4.jsonl.zstd'), 'survivor');
   await writeFile(path.join(orphanDir, 'session.v4.jsonl.zstd'), 'orphan');
   await writeFile(path.join(bareDir, 'session.v4.jsonl.zstd'), 'subagent-style bare id');
+  await writeFile(path.join(archivedDir, 'session.v4.jsonl.zstd'), 'archived session log');
 
   const cacheDir = options.projectionCacheRoot;
   await writeFile(
@@ -174,19 +202,55 @@ async function main() {
   assert.throws(() => resolveOptions({ dataDir: filesystemRoot }), PurgeError);
 
   const listing = await listSessions(ctx, options, { limit: 10, currentSessionId: targetId });
-  assert.equal(listing.total, 4, 'two stored sessions plus two orphan directories');
+  assert.equal(listing.total, 5, 'two stored sessions plus three on-disk-only session directories');
   assert.equal(listing.shown.find((row) => row.id === targetId).current, true);
 
-  const changingLiveIds = [];
-  const dynamicCtx = makeContext(persistence, { liveIds: changingLiveIds });
+  const changingRunningIds = [];
+  const dynamicCtx = makeContext(persistence, { runningIds: changingRunningIds });
   let dynamicListing = await listSessions(dynamicCtx, options, { limit: 10 });
   assert.equal(dynamicListing.shown.find((row) => row.id === survivorId).live, false);
-  changingLiveIds.push(survivorId);
+  changingRunningIds.push(survivorId);
   dynamicListing = await listSessions(dynamicCtx, options, { limit: 10 });
   assert.equal(dynamicListing.shown.find((row) => row.id === survivorId).live, true);
-  changingLiveIds.length = 0;
+  changingRunningIds.length = 0;
   dynamicListing = await listSessions(dynamicCtx, options, { limit: 10 });
   assert.equal(dynamicListing.shown.find((row) => row.id === survivorId).live, false);
+
+  // A resident agent is not a running session: an idle agent must not lock the
+  // row, and an archived session with an idle agent stays deletable without a
+  // restart. Only a running turn refuses the purge.
+  const idleCtx = makeContext(persistence, { idleIds: [survivorId] });
+  const idleListing = await listSessions(idleCtx, options, { limit: 10 });
+  const idleRow = idleListing.shown.find((row) => row.id === survivorId);
+  assert.equal(idleRow.live, false, 'an idle resident agent is not reported as running');
+  assert.equal(idleRow.resident, true, 'the resident flag still records the in-memory agent');
+  assert.equal((await planPurge(idleCtx, options, [survivorId], { currentSessionId: 'session-current' })).blockers.length, 0);
+
+  const archivedCtx = makeContext(persistence, {
+    idleIds: [archivedId],
+    archivedIds: [archivedId],
+    pinnedIds: [archivedId],
+  });
+  const archivedListing = await listSessions(archivedCtx, options, { limit: 10 });
+  const archivedRow = archivedListing.shown.find((row) => row.id === archivedId);
+  assert.equal(archivedRow.archived, true);
+  assert.equal(archivedRow.live, false);
+  assert.equal(archivedRow.resident, true);
+  const archivedPlan = await planPurge(archivedCtx, options, [archivedId], { currentSessionId: 'session-current' });
+  assert.equal(archivedPlan.blockers.length, 0, 'an archived, idle session is deletable');
+  assert.ok(
+    archivedPlan.warnings.some((warning) => warning.includes('resident')),
+    'residency is reported as a warning, not a blocker',
+  );
+  const archivedPurge = await purgeSessions(archivedCtx, options, [archivedId], {
+    currentSessionId: 'session-current',
+    purgeAttachments: false,
+  });
+  assert.equal(archivedPurge.verified, true);
+  assert.equal(await exists(archivedDir), false, 'archived session log directory removed');
+  assert.deepEqual(archivedPurge.metadata.pruned, [archivedId], 'the archived entry is dropped after the purge');
+  assert.deepEqual(archivedCtx.workspaceRegistry.archivedSessionIds, []);
+  assert.deepEqual(archivedCtx.workspaceRegistry.pinnedSessionIds, []);
 
   const plan = await planPurge(ctx, options, [targetId, orphanId, bareId], { currentSessionId: 'session-current' });
   assert.equal(plan.blockers.length, 0);
@@ -227,12 +291,12 @@ async function main() {
   assert.equal(Object.hasOwn(seed.tables.sessions, targetId.slice('session-'.length)), false);
   assert.equal(Object.hasOwn(seed.tables.sessions, survivorId), true);
 
-  const liveCtx = makeContext(persistence, { liveIds: [survivorId] });
+  const liveCtx = makeContext(persistence, { runningIds: [survivorId] });
   const live = await planPurge(liveCtx, options, [survivorId], { currentSessionId: 'session-current' });
   assert.equal(live.blockers.length, 1);
   await assert.rejects(
     purgeSessions(liveCtx, options, [survivorId], { currentSessionId: 'session-current' }),
-    /live agent/,
+    /running turn/,
   );
 
   await assert.rejects(purgeSessions(ctx, options, ['../escape'], {}), /invalid session id/);
